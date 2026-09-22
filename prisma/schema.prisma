@@ -1,0 +1,80 @@
+// Schéma de données Kion Map.
+// SQLite pour démarrer ; passer à PostgreSQL = changer le provider et l'adapter.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  VIEWER    // utilisateur : consultation uniquement
+  MODERATOR // modérateur : création / modification des données
+  ADMIN     // super admin : tous les droits, gestion des comptes
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  displayName  String?
+  role         Role     @default(VIEWER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Plan {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  width       Int      @default(1200)
+  height      Int      @default(800)
+  /// Image de fond (plan scanné), stockée en data URL
+  background  String?
+  /// Éléments dessinés : murs, pièces, textes (voir src/lib/types.ts)
+  shapes      Json     @default("[]")
+  zones       Zone[]
+  devices     Device[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Zone {
+  id          Int      @id @default(autoincrement())
+  planId      Int
+  plan        Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  color       String   @default("#3b82f6")
+  /// Polygone [[x, y], ...]
+  points      Json     @default("[]")
+  devices     Device[]
+
+  @@unique([planId, name])
+}
+
+model Device {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  type         String   @default("pc")
+  ip           String?
+  mac          String?
+  assignedUser String?
+  description  String?
+  location     String?
+  planId       Int?
+  plan         Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+  zoneId       Int?
+  zone         Zone?    @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  /// Position sur le plan (null = pas encore placé)
+  x            Float?
+  y            Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([ip])
+  @@index([planId])
+}
