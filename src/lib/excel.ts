@@ -1,7 +1,7 @@
 import "server-only";
 import ExcelJS from "exceljs";
 import { prisma } from "./prisma";
-import { normalizeDeviceType, deviceType } from "./types";
+import { DEVICE_TYPES, normalizeDeviceType, deviceType } from "./types";
 import { isValidIp } from "./validation";
 import { ApiError } from "./api";
 
@@ -208,33 +208,156 @@ export async function importRows(rows: Row[]): Promise<ImportReport> {
   return report;
 }
 
-function styleHeader(ws: ExcelJS.Worksheet) {
-  ws.columns = COLUMNS.map((c) => ({ header: c.header, key: c.key, width: c.key === "description" ? 40 : 20 }));
-  const header = ws.getRow(1);
-  header.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E40AF" } };
-  ws.views = [{ state: "frozen", ySplit: 1 }];
+// ---------------------------------------------------------------------------
+// Modèle d'import et export : même mise en forme, pour pouvoir réimporter un export.
+// Format documenté dans docs/import-excel.md.
+
+const FONT = "Arial";
+const BLUE = "FF1E40AF";
+const RED = "FFB91C1C";
+const LAST_ROW = 1000; // lignes équipées des listes déroulantes et contrôles
+
+/** Aide affichée dans Excel quand on sélectionne une cellule de la colonne (255 caractères max). */
+const HELP: Record<Key, { width: number; max: number; prompt: string }> = {
+  name: { width: 20, max: 100, prompt: "OBLIGATOIRE et UNIQUE (hostname). Un nom déjà présent dans Kion Map met l'appareil à jour au lieu d'en créer un nouveau." },
+  type: { width: 18, max: 30, prompt: "Choisir dans la liste déroulante (onglet Listes)." },
+  ip: { width: 16, max: 64, prompt: "IPv4 (ex. 10.0.20.21) ou IPv6. Facultatif. Une IP invalide fait ignorer la ligne." },
+  mac: { width: 20, max: 64, prompt: "Format 00:1A:2B:3C:4D:5E. Facultatif." },
+  assignedUser: { width: 24, max: 100, prompt: "Prénom Nom (ou service pour un équipement partagé, ex. Service IT). Toujours la même orthographe : ce nom regroupe les postes de la personne (onglet Opérateurs)." },
+  description: { width: 42, max: 2000, prompt: "Texte libre : modèle, rôle, remarques…" },
+  location: { width: 28, max: 200, prompt: "Précision libre : bureau, baie, étage… (ex. Bureau 12, Baie A - U12)." },
+  plan: { width: 14, max: 100, prompt: "Nom exact du plan (ex. RDC, 1er étage). Créé automatiquement s'il n'existe pas." },
+  zone: { width: 24, max: 100, prompt: "Nom exact de la zone dans ce plan (ex. Comptabilité). Créée si besoin (contour à dessiner ensuite). Nécessite la colonne Plan." },
+};
+
+const TYPE_EXAMPLES: Record<string, string> = {
+  pc: "Poste de bureau",
+  laptop: "Ordinateur portable",
+  server: "Serveur physique ou virtuel",
+  switch: "Switch réseau",
+  router: "Routeur",
+  box: "Box opérateur (fibre, ADSL)",
+  firewall: "Pare-feu",
+  access_point: "Point d'accès Wi-Fi",
+  printer: "Imprimante, copieur, traceur",
+  phone: "Téléphone IP",
+  nas: "NAS, stockage, enregistreur vidéo",
+  camera: "Caméra IP",
+  other: "Visio, vidéoprojecteur, contrôleur…",
+};
+
+type Values = Partial<Record<Key, string | null | undefined>>;
+
+/** Onglet « Appareils » : en-têtes, formats, listes déroulantes, contrôles et aides. */
+function devicesSheet(wb: ExcelJS.Workbook, rows: Values[]) {
+  const ws = wb.addWorksheet("Appareils", { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] });
+  ws.columns = COLUMNS.map((c) => ({ header: c.header, key: c.key, width: HELP[c.key].width }));
+  ws.getRow(1).height = 22;
+  ws.getRow(1).eachCell((cell, col) => {
+    cell.font = { name: FONT, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: col === 1 ? RED : BLUE } };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+  });
+  ws.addRows(rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v || null]))));
+
+  const lastRow = Math.max(LAST_ROW, rows.length + 100);
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: lastRow, column: COLUMNS.length } };
+  const typeList = `Listes!$A$2:$A$${DEVICE_TYPES.length + 1}`;
+  for (let r = 2; r <= lastRow; r++) {
+    const row = ws.getRow(r);
+    COLUMNS.forEach((c, i) => {
+      const cell = row.getCell(i + 1);
+      cell.font = { name: FONT };
+      // IP et MAC en texte : Excel ne les transforme pas en nombres ou en dates.
+      if (c.key === "ip" || c.key === "mac") cell.numFmt = "@";
+      const help = HELP[c.key];
+      const base = { allowBlank: true, showInputMessage: true, promptTitle: c.header, prompt: help.prompt, showErrorMessage: true };
+      if (c.key === "type") {
+        cell.dataValidation = { ...base, type: "list", formulae: [typeList], errorTitle: "Type inconnu", error: "Choisissez un type dans la liste (onglet Listes)." };
+      } else if (c.key === "name") {
+        cell.dataValidation = { ...base, promptTitle: "Nom (obligatoire)", type: "custom", formulae: [`COUNTIF($A$2:$A$${lastRow},A${r})=1`], errorTitle: "Nom en double", error: "Ce nom existe déjà dans le fichier : chaque appareil doit avoir un nom unique." };
+      } else if (c.key === "zone") {
+        cell.dataValidation = { ...base, type: "custom", formulae: [`OR(I${r}="",H${r}<>"")`], errorStyle: "warning", errorTitle: "Plan manquant", error: "Une zone doit être accompagnée d'un plan (colonne Plan)." };
+      } else {
+        cell.dataValidation = { ...base, type: "textLength", operator: "lessThanOrEqual", formulae: [help.max], errorTitle: "Texte trop long", error: `${help.max} caractères maximum.` };
+      }
+    });
+  }
+  return ws;
 }
+
+function listsSheet(wb: ExcelJS.Workbook) {
+  const ws = wb.addWorksheet("Listes");
+  ws.columns = [
+    { header: "Type (valeur à utiliser)", width: 26 },
+    { header: "Exemples d'appareils", width: 44 },
+  ];
+  ws.getRow(1).eachCell((cell) => {
+    cell.font = { name: FONT, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLUE } };
+  });
+  for (const t of DEVICE_TYPES) {
+    const row = ws.addRow([t.label, TYPE_EXAMPLES[t.value] ?? ""]);
+    row.getCell(1).font = { name: FONT };
+    row.getCell(2).font = { name: FONT, color: { argb: "FF475569" } };
+  }
+}
+
+function guideSheet(wb: ExcelJS.Workbook, withExamples: boolean) {
+  const ws = wb.addWorksheet("Mode d'emploi");
+  ws.columns = [{ width: 4 }, { width: 22 }, { width: 100 }];
+  ws.getCell("B1").value = "Kion Map – import des appareils";
+  ws.getCell("B1").font = { name: FONT, bold: true, size: 14, color: { argb: BLUE } };
+  const lines: [string, string, string][] = [
+    ["1", "Remplir", "Complétez l'onglet « Appareils » : une ligne par appareil. Seule la colonne Nom (en rouge) est obligatoire."],
+    ...(withExamples
+      ? ([["2", "Exemples", "Les lignes 2 à 9 sont des EXEMPLES : supprimez-les ou remplacez-les par vos données avant l'import."]] as [string, string, string][])
+      : []),
+    [withExamples ? "3" : "2", "Importer", "Dans Kion Map : Appareils → ⬆ Import Excel → choisir ce fichier → Importer (compte Modérateur ou Super admin)."],
+    [withExamples ? "4" : "3", "Vérifier", "Lisez le rapport : créés / mis à jour / ignorés (avec le numéro de ligne et la raison)."],
+    [withExamples ? "5" : "4", "Placer", "Plans → ✏️ : dessinez le contour des zones créées (onglet Zones → Dessiner), puis placez les appareils (onglet Appareils → Placer)."],
+    ["", "", ""],
+    ["", "Règles importantes", ""],
+    ["•", "Première feuille", "Seul le PREMIER onglet est lu, et la ligne 1 doit rester la ligne d'en-têtes. Ne renommez pas les colonnes."],
+    ["•", "Nom unique", "Un nom déjà présent met à jour l'appareil (sa position sur le plan est conservée s'il reste sur le même plan). Majuscules ignorées : « pc-achats-01 » = « PC-ACHATS-01 »."],
+    ["•", "Type", "Utilisez la liste déroulante. Un libellé proche est aussi compris (Poste, Livebox, Copieur, Wifi…) ; sinon le type devient « Autre »."],
+    ["•", "IP", "Une IP invalide (ex. 10.0.300.1) fait ignorer toute la ligne. Laissez vide si inconnue."],
+    ["•", "Utilisateur", "Toujours la même orthographe (Prénom Nom) : c'est ce qui regroupe les postes d'une personne dans l'onglet Opérateurs. Équipement partagé : le service (ex. Service IT)."],
+    ["•", "Plan / Zone", "Noms exacts, comme dans l'application. Un plan ou une zone inconnus sont créés automatiquement ; une zone sans plan est ignorée."],
+    ["•", "Lignes vides", "Ignorées ; une ligne sans Nom est signalée dans le rapport."],
+    ["•", "Taille", "4 Mo maximum (plusieurs milliers d'appareils)."],
+    ["•", "Mise à jour", "Appareils → ⬇ Export Excel, corrigez, puis réimportez. Supprimer une ligne du fichier ne supprime pas l'appareil."],
+  ];
+  lines.forEach(([n, a, b], i) => {
+    const row = ws.getRow(i + 3);
+    row.getCell(1).value = n;
+    row.getCell(1).font = { name: FONT, bold: true, color: { argb: BLUE } };
+    row.getCell(2).value = a;
+    row.getCell(2).font = { name: FONT, bold: true, size: a === "Règles importantes" ? 12 : 10 };
+    row.getCell(3).value = b;
+    row.getCell(3).font = { name: FONT };
+    row.getCell(3).alignment = { wrapText: true, vertical: "top" };
+    row.getCell(2).alignment = { vertical: "top" };
+  });
+}
+
+/** Exemples du modèle : un service complet (poste, téléphone, portable, imprimante) + infrastructure. */
+const TEMPLATE_EXAMPLES: Values[] = [
+  { name: "PC-ACHATS-01", type: "PC fixe", ip: "10.0.20.31", mac: "00:1A:3F:22:8B:01", assignedUser: "Claire Martin", description: "Dell OptiPlex 7010 – poste achats", location: "Bureau 14", plan: "1er étage", zone: "Achats" },
+  { name: "TEL-ACHATS-01", type: "Téléphone IP", ip: "10.0.20.131", mac: "00:1A:3F:22:8B:02", assignedUser: "Claire Martin", description: "Yealink T54W", location: "Bureau 14", plan: "1er étage", zone: "Achats" },
+  { name: "LT-ACHATS-02", type: "Portable", ip: "10.0.20.32", mac: "00:1A:3F:22:8B:03", assignedUser: "Paul Renard", description: "Lenovo ThinkPad T14 – télétravail", location: "Bureau 15", plan: "1er étage", zone: "Achats" },
+  { name: "IMP-ACHATS", type: "Imprimante", ip: "10.0.20.85", mac: "00:1A:3F:22:8B:04", assignedUser: "Service achats", description: "HP LaserJet M507 – partagée", location: "Couloir 1er", plan: "1er étage", zone: "Achats" },
+  { name: "SRV-GED", type: "Serveur", ip: "10.0.1.40", mac: "00:1A:3F:22:8B:05", assignedUser: "Service IT", description: "Serveur GED (VM), sauvegardé chaque nuit", location: "Salle serveur - Baie B U20", plan: "RDC", zone: "Baie B (serveurs)" },
+  { name: "SW-ETAGE1-02", type: "Switch", ip: "10.0.0.14", mac: "00:1A:3F:22:8B:06", assignedUser: "Service IT", description: "Switch 24 ports PoE", location: "Local reprographie - baie U18", plan: "1er étage", zone: "Local reprographie" },
+  { name: "AP-1-ACHATS", type: "Borne Wi-Fi", ip: "10.0.0.54", mac: "00:1A:3F:22:8B:07", assignedUser: "Service IT", description: "Borne plafond Wi-Fi 6", location: "Achats - plafond", plan: "1er étage", zone: "Achats" },
+  { name: "LT-STOCK-10", type: "Portable", mac: "00:1A:3F:22:8B:08", description: "Portable neuf en stock, non attribué", location: "Armoire IT" },
+];
 
 export async function buildTemplate(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Appareils");
-  styleHeader(ws);
-  ws.addRows([
-    { name: "SRV-AD01", type: "Serveur", ip: "192.168.1.10", mac: "00:1A:2B:3C:4D:5E", assignedUser: "Service IT", description: "Contrôleur de domaine", location: "Baie A - U12", plan: "RDC", zone: "Salle serveur" },
-    { name: "SW-CORE", type: "Switch", ip: "192.168.1.2", assignedUser: "Service IT", description: "Switch cœur 48 ports", location: "Baie A - U40", plan: "RDC", zone: "Salle serveur" },
-    { name: "BOX-FIBRE", type: "Box", ip: "192.168.1.1", description: "Box opérateur", location: "Local technique", plan: "RDC", zone: "Salle serveur" },
-    { name: "PC-COMPTA-01", type: "PC", ip: "192.168.1.51", assignedUser: "Marie Dupont", description: "Poste comptabilité", location: "Bureau 12", plan: "1er étage", zone: "Comptabilité" },
-  ]);
-  const help = wb.addWorksheet("Aide");
-  help.columns = [{ header: "Colonne", width: 16 }, { header: "Contenu", width: 90 }];
-  help.getRow(1).font = { bold: true };
-  help.addRows([
-    ["Nom", "Obligatoire et unique. Un nom déjà connu met l'appareil à jour."],
-    ["Type", `Un parmi : ${["pc", "laptop", "server", "switch", "router", "box", "firewall", "access_point", "printer", "phone", "nas", "camera", "other"].map((t) => deviceType(t).label).join(", ")}`],
-    ["IP", "Adresse IPv4 ou IPv6 (facultative)."],
-    ["Plan / Zone", "Créés automatiquement s'ils n'existent pas. Les zones créées sont à dessiner ensuite dans l'éditeur de plan."],
-  ]);
+  devicesSheet(wb, TEMPLATE_EXAMPLES);
+  guideSheet(wb, true);
+  listsSheet(wb);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -244,9 +367,9 @@ export async function buildExport(): Promise<Buffer> {
     include: { plan: { select: { name: true } }, zone: { select: { name: true } } },
   });
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Appareils");
-  styleHeader(ws);
-  ws.addRows(
+  // Même format que le modèle : l'export peut être corrigé puis réimporté tel quel.
+  devicesSheet(
+    wb,
     devices.map((d) => ({
       name: d.name,
       type: deviceType(d.type).label,
@@ -259,5 +382,7 @@ export async function buildExport(): Promise<Buffer> {
       zone: d.zone?.name,
     })),
   );
+  guideSheet(wb, false);
+  listsSheet(wb);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

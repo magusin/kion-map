@@ -104,21 +104,15 @@ npm run dev                  # http://localhost:3000
 
 ## Import Excel
 
-Téléchargez le modèle depuis **Appareils → Import Excel**. La première ligne contient les en-têtes, et seule la colonne **Nom** est obligatoire :
+Le format complet est décrit dans **[docs/import-excel.md](docs/import-excel.md)** : colonnes, valeurs de Type, règles d'import, rapport et exemple.
 
-| Nom | Type | IP | MAC | Utilisateur | Description | Localisation | Plan | Zone |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SRV-AD01 | Serveur | 192.168.1.10 | 00:1A:… | Service IT | Contrôleur de domaine | Baie A - U12 | RDC | Salle serveur |
+En résumé :
 
-- Les en-têtes courants sont reconnus aussi (« Adresse IP », « Hostname », « Emplacement », « Étage », « Salle »…), avec ou sans accents ni majuscules.
-- Le type se déduit du libellé (« Poste », « Livebox », « Imprimante », « Borne wifi »… ; « Autre » par défaut).
-- Un appareil dont le **nom** existe déjà est mis à jour. S'il reste sur le même plan, sa position est conservée.
-- Les plans et zones inconnus sont créés. Les zones créées ainsi n'ont pas encore de contour : dessinez-le avec l'éditeur (**Zones → Dessiner**).
-- Fichier de 4 Mo maximum. Seule la première feuille du classeur est lue.
-- Les noms (appareils, plans, zones) sont comparés sans tenir compte des majuscules : « srv-ad01 » met à jour « SRV-AD01 ».
-- Un rapport indique les créations, les mises à jour et les lignes ignorées (nom manquant, IP invalide…).
-
-**Export Excel** (tous les rôles) : le même format, qu'on peut donc réimporter.
+- Téléchargez le modèle depuis **Appareils → Import Excel → Télécharger le modèle Excel**. Il contient 3 onglets : **Appareils** (seul onglet lu), **Mode d'emploi** et **Listes**. Il propose une liste déroulante pour le Type, un contrôle des noms en double et une aide sur chaque colonne.
+- Colonnes : **Nom** (obligatoire, unique), Type, IP, MAC, Utilisateur, Description, Localisation, Plan, Zone.
+- Un Nom déjà présent met l'appareil à jour. Les plans et zones inconnus sont créés automatiquement.
+- **L'export Excel a le même format** : exportez, corrigez, réimportez.
+- 4 Mo maximum, en `.xlsx` ou `.csv`.
 
 ## Éditeur de plan (modérateur)
 
