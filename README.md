@@ -47,6 +47,16 @@ Cartographie du parc informatique : PC, serveurs, switchs, box, bornes Wi-Fi, im
 
 Limites propres à Vercel : un import Excel fait **4 Mo** au maximum, et les images de fond trop lourdes sont compressées automatiquement dans le navigateur avant l'envoi.
 
+### Données de démonstration
+
+Pour tester avec des données factices mais cohérentes, ajoutez la variable `SEED_DEMO` = `true` dans Vercel, puis redéployez. Vous obtenez :
+
+- **3 plans** (RDC, 1er étage, 2e étage) dessinés, avec une zone par pièce et deux sous-zones (Baie A et Baie B) dans la salle serveur ;
+- **environ 130 appareils** placés : postes et téléphones nominatifs, serveurs, switchs, pare-feu, box, bornes Wi-Fi, imprimantes, caméras, NAS. L'adressage IP est cohérent : `10.0.0.x` pour le réseau, `10.0.1.x` pour les serveurs, `10.0.10/20/30.x` pour les étages, `10.0.50.x` pour la vidéo ;
+- **4 appareils en stock**, sans plan, pour tester le placement.
+
+L'opération est sans risque à répéter : un plan ou un appareil qui existe déjà (même nom) n'est pas recréé. Retirez `SEED_DEMO` après le déploiement. En local : `npm run db:demo`.
+
 ### Dépannage
 
 Ouvrez **`https://<votre-site>/api/health`** (sans être connecté). La page indique ce qui ne va pas, sans jamais afficher de secret :
@@ -88,7 +98,7 @@ npm run dev                  # http://localhost:3000
 | `npm run vercel-build` | Build utilisé par Vercel : migrations, super admin, build |
 | `npm run db:migrate` | Applique les migrations Prisma |
 | `npm run db:seed` | Crée le super admin s'il n'existe pas |
-| `npm run db:demo` | Seed + données de démonstration (si aucun plan n'existe) |
+| `npm run db:demo` | Seed + données de démonstration (3 plans, environ 130 appareils) |
 | `npm run db:studio` | Prisma Studio, pour explorer la base |
 
 ## Import Excel

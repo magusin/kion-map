@@ -49,17 +49,10 @@ type Props = CanvasHandlers & {
   overlay?: (unitsPerPx: number) => React.ReactNode;
 };
 
-export function centroid(pts: Point[]): Point {
-  // Centre de gravité du polygone (repli sur la moyenne si aire nulle).
-  let a = 0, cx = 0, cy = 0;
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const f = pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1];
-    a += f;
-    cx += (pts[j][0] + pts[i][0]) * f;
-    cy += (pts[j][1] + pts[i][1]) * f;
-  }
-  if (Math.abs(a) < 1e-6) return [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
-  return [cx / (3 * a), cy / (3 * a)];
+/** Point d'ancrage du nom d'une zone : son sommet le plus en haut à gauche.
+ *  Le nom se place dans le coin de la zone, sans masquer les appareils au centre. */
+export function labelAnchor(pts: Point[]): Point {
+  return pts.reduce((best, p) => (p[0] + p[1] < best[0] + best[1] ? p : best), pts[0]);
 }
 
 function targetOf(el: EventTarget | null): CanvasTarget {
@@ -271,14 +264,14 @@ export default function PlanCanvas(props: Props) {
           );
         })}
         {visibleZones.map((z) => {
-          const [cx, cy] = centroid(z.points);
+          const [ax, ay] = labelAnchor(z.points);
           return (
             <text
               key={`l${z.id}`}
-              x={cx}
-              y={cy}
-              textAnchor="middle"
-              dominantBaseline="middle"
+              x={ax + 6 * k}
+              y={ay + 6 * k}
+              textAnchor="start"
+              dominantBaseline="hanging"
               fontSize={13 * k}
               fontWeight={700}
               fill={z.color}
