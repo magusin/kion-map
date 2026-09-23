@@ -58,6 +58,7 @@ Ouvrez **`https://<votre-site>/api/health`** (sans être connecté). La page ind
 | `DATABASE_URL manquant` | Liez la base Neon au projet (Storage), ou ajoutez la variable pour l'environnement concerné (Production ou Preview). |
 | `identifiants de DATABASE_URL refusés` | Le mot de passe Neon a changé : mettez à jour `DATABASE_URL` et `DATABASE_URL_UNPOOLED`. |
 | `aucun super admin` | Définissez `ADMIN_PASSWORD` (8 caractères minimum), puis redéployez. |
+| « Identifiants invalides » pour l'admin | Le compte existe déjà avec un ancien mot de passe. Ajoutez `ADMIN_RESET_PASSWORD` = `true`, redéployez, connectez-vous avec `ADMIN_PASSWORD`, puis **supprimez** `ADMIN_RESET_PASSWORD` (sinon chaque déploiement réinitialise le mot de passe). |
 
 Une variable ajoutée ou modifiée dans Vercel ne s'applique qu'**après un redéploiement**.
 
