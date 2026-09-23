@@ -12,16 +12,17 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:demo": "tsx prisma/seed.ts --demo"
+    "db:demo": "tsx prisma/seed.ts --demo",
+    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && next build"
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.10.0",
+    "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^13.0.3",
     "exceljs": "^4.4.0",
     "jose": "^6.2.12",
     "next": "16.3.6",
+    "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
@@ -29,8 +30,8 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^18.0.3",

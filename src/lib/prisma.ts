@@ -1,14 +1,15 @@
 import "server-only";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createClient() {
-  const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "file:./data/kion-map.db" });
-  return new PrismaClient({ adapter });
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL manquant (voir .env.example)");
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 }
 
-// Une seule instance en dev malgré le hot reload.
+// Une seule instance par process (hot reload en dev, instances réutilisées sur Vercel).
 export const prisma = globalForPrisma.prisma ?? createClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+globalForPrisma.prisma = prisma;

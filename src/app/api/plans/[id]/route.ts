@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { handle, readJson, parseId } from "@/lib/api";
 import { requireApiUser } from "@/lib/auth";
 import { planUpdateSchema } from "@/lib/validation";
-import { deviceInclude } from "@/lib/devices";
+import { assertNameFree, deviceInclude } from "@/lib/devices";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -21,6 +21,7 @@ export const PATCH = handle(async (req: Request, { params }: Ctx) => {
   await requireApiUser("MODERATOR");
   const id = parseId((await params).id);
   const data = planUpdateSchema.parse(await readJson(req));
+  if (data.name) await assertNameFree("plan", data.name, id);
   const plan = await prisma.plan.update({ where: { id }, data });
   // L'image de fond (data URL volumineuse) n'est pas renvoyée.
   const { background, ...rest } = plan;

@@ -830,8 +830,8 @@ function PlanSettings({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) return flash("Image trop lourde (8 Mo max)", true);
-    const dataUrl = await new Promise<string>((resolve, reject) => {
+    if (file.size > 30 * 1024 * 1024) return flash("Image trop lourde (30 Mo max)", true);
+    let dataUrl = await new Promise<string>((resolve, reject) => {
       const r = new FileReader();
       r.onload = () => resolve(r.result as string);
       r.onerror = reject;
@@ -840,6 +840,12 @@ function PlanSettings({
     const img = new Image();
     img.src = dataUrl;
     await img.decode().catch(() => {});
+    if (dataUrl.length > MAX_BACKGROUND && img.naturalWidth) {
+      dataUrl = compressImage(img);
+      if (dataUrl.length > MAX_BACKGROUND) return flash("Image trop lourde, même compressée", true);
+    } else if (dataUrl.length > MAX_BACKGROUND) {
+      return flash("Image trop lourde (SVG de 3 Mo max)", true);
+    }
     const body: Record<string, unknown> = { background: dataUrl };
     if (img.naturalWidth && confirm(`Adapter la taille du plan à l'image (${img.naturalWidth} × ${img.naturalHeight}) ?`)) {
       body.width = Math.min(10000, Math.max(200, img.naturalWidth));
@@ -891,7 +897,7 @@ function PlanSettings({
 
       <div className="space-y-2 border-t border-slate-200 pt-3">
         <h3 className="label">Image de fond</h3>
-        <p className="text-xs text-slate-500">Importez un plan scanné ou exporté (PNG, JPG, SVG) puis dessinez les zones par-dessus.</p>
+        <p className="text-xs text-slate-500">Importez un plan scanné ou exporté (PNG, JPG, SVG) puis dessinez les zones par-dessus. Les images lourdes sont compressées automatiquement.</p>
         <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" onChange={onBackground} className="block w-full text-xs" />
         {plan.background && (
           <button className="btn btn-sm" onClick={() => save({ background: null })}>
@@ -907,4 +913,26 @@ function PlanSettings({
       </div>
     </div>
   );
+}
+
+// Taille max. de l'image encodée (limite de 4,5 Mo par requête sur Vercel).
+const MAX_BACKGROUND = 3_500_000;
+
+/** Réduit l'image (JPEG, fond blanc) jusqu'à passer sous la limite. */
+function compressImage(img: HTMLImageElement): string {
+  let scale = Math.min(1, 4000 / Math.max(img.naturalWidth, img.naturalHeight));
+  let out = "";
+  for (let i = 0; i < 8; i++) {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    out = canvas.toDataURL("image/jpeg", 0.85);
+    if (out.length <= MAX_BACKGROUND) break;
+    scale *= 0.8;
+  }
+  return out;
 }

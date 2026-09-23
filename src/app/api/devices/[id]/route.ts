@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { handle, readJson, parseId } from "@/lib/api";
 import { requireApiUser } from "@/lib/auth";
 import { deviceSchema } from "@/lib/validation";
-import { deviceInclude, resolvePlacement } from "@/lib/devices";
+import { assertNameFree, deviceInclude, resolvePlacement } from "@/lib/devices";
 import { normalizeDeviceType } from "@/lib/types";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -21,6 +21,7 @@ export const PATCH = handle(async (req: Request, { params }: Ctx) => {
   const body = (await readJson(req)) as Record<string, unknown>;
   const data = deviceSchema.partial().parse(body);
   const current = await prisma.device.findUniqueOrThrow({ where: { id } });
+  if (data.name) await assertNameFree("device", data.name, id);
 
   const placementTouched = ["planId", "zoneId", "x", "y"].some((k) => k in body);
   const planId = "planId" in body ? (data.planId ?? null) : current.planId;

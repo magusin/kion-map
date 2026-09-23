@@ -74,15 +74,22 @@ export async function recomputeDeviceZones(planId: number) {
   }
 }
 
+/** Les noms d'appareils et de plans sont uniques sans tenir compte de la casse. */
+export async function assertNameFree(kind: "device" | "plan", name: string, exceptId?: number) {
+  const where = { name: { equals: name, mode: "insensitive" as const }, ...(exceptId ? { NOT: { id: exceptId } } : {}) };
+  const taken = kind === "device" ? await prisma.device.findFirst({ where }) : await prisma.plan.findFirst({ where });
+  if (taken) throw new ApiError(409, `« ${taken.name} » existe déjà`);
+}
+
 export function searchWhere(q: string | null | undefined): Prisma.DeviceWhereInput {
   const term = q?.trim();
   if (!term) return {};
   const fields = ["name", "ip", "mac", "assignedUser", "description", "location", "type"] as const;
   return {
     OR: [
-      ...fields.map((f) => ({ [f]: { contains: term } })),
-      { zone: { name: { contains: term } } },
-      { plan: { name: { contains: term } } },
+      ...fields.map((f) => ({ [f]: { contains: term, mode: "insensitive" as const } })),
+      { zone: { name: { contains: term, mode: "insensitive" } } },
+      { plan: { name: { contains: term, mode: "insensitive" } } },
     ],
   };
 }

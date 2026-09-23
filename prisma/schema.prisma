@@ -1,5 +1,4 @@
-// Schéma de données Kion Map.
-// SQLite pour démarrer ; passer à PostgreSQL = changer le provider et l'adapter.
+// Schéma de données Kion Map (PostgreSQL, ex. Neon).
 
 generator client {
   provider = "prisma-client"
@@ -7,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 enum Role {

@@ -41,6 +41,4 @@ yarn-error.log*
 next-env.d.ts
 !.env.example
 
-# base de données locale
-/data/
 /src/generated/

@@ -17,31 +17,50 @@ Cartographie du parc informatique : PC, serveurs, switchs, box, bornes Wi-Fi, im
 ## Stack
 
 - [Next.js 16](https://nextjs.org) (App Router, route handlers pour l'API REST) + React 19 + Tailwind CSS 4
-- [Prisma 7](https://www.prisma.io) avec SQLite (adapter `better-sqlite3`)
+- [Prisma 7](https://www.prisma.io) avec PostgreSQL (hébergé sur [Neon](https://neon.tech), adapter `@prisma/adapter-pg`)
 - Sessions JWT (`jose`) dans un cookie httpOnly, mots de passe hachés avec `bcryptjs`
 - `exceljs` pour l'import et l'export
 
-## Démarrage
+## Où sont stockées les données ?
 
-Prérequis : Node.js ≥ 20.9.
+**Tout est dans la base PostgreSQL** : comptes, plans (dessin et image de fond), zones et appareils. Le fichier Excel sert seulement à importer (ou exporter) des appareils. Une fois importés, ils vivent dans la base et se modifient dans l'application.
+
+## Déploiement sur Vercel + Neon
+
+1. **Base Neon** : sur Vercel, ouvrez le projet, puis **Storage → Create Database → Neon** (ou *Connect* si la base existe déjà) et liez-la au projet. L'intégration ajoute les variables `DATABASE_URL` (connexion poolée) et `DATABASE_URL_UNPOOLED` (connexion directe).
+   - Si vous créez la base directement sur neon.tech, copiez ces deux URL depuis **Connect** (l'URL poolée contient `-pooler`) et ajoutez-les à la main dans Vercel.
+2. **Autres variables** (Vercel → Settings → Environment Variables, pour *Production* et *Preview*) :
+
+   | Variable | Valeur |
+   | --- | --- |
+   | `SESSION_SECRET` | Longue chaîne aléatoire : `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
+   | `ADMIN_USERNAME` | Identifiant du super admin, par exemple `admin` |
+   | `ADMIN_PASSWORD` | Mot de passe du super admin (8 caractères minimum) |
+   | `COOKIE_SECURE` | `true` |
+
+3. **Redéployez** (Deployments → ⋯ → Redeploy). Le script `vercel-build` :
+   - applique les migrations (`prisma migrate deploy`), ce qui crée les tables au premier déploiement ;
+   - crée le super admin s'il n'existe pas encore ;
+   - construit l'application.
+4. Connectez-vous avec `ADMIN_USERNAME` / `ADMIN_PASSWORD`, puis créez les autres comptes dans **Comptes**. Changer `ADMIN_PASSWORD` plus tard ne modifie pas un compte existant : changez le mot de passe dans l'application (**Mon compte**).
+
+Limites propres à Vercel : un import Excel fait **4 Mo** au maximum, et les images de fond trop lourdes sont compressées automatiquement dans le navigateur avant l'envoi.
+
+## Développement en local
+
+Prérequis : Node.js ≥ 20.9 et une base PostgreSQL. Le plus simple est une **branche de développement Neon** (Neon → Branches → New branch), pour ne pas toucher aux données de production. Un PostgreSQL local fonctionne aussi.
 
 ```bash
+git clone https://github.com/magusin/kion-map.git
+cd kion-map
 npm install
-cp .env.example .env         # puis renseignez SESSION_SECRET et le mot de passe admin
-npx prisma migrate deploy    # crée la base SQLite dans ./data
-npm run db:seed              # crée le super admin (ADMIN_USERNAME / ADMIN_PASSWORD)
-# facultatif : npm run db:demo  -> super admin + un plan d'exemple avec zones et appareils
+cp .env.example .env         # sous Windows : copy .env.example .env
+# éditez .env : DATABASE_URL, SESSION_SECRET, ADMIN_PASSWORD, COOKIE_SECURE="false"
+npx prisma migrate deploy    # crée les tables
+npm run db:seed              # crée le super admin
+# facultatif : npm run db:demo  -> un plan d'exemple avec zones et appareils
 npm run dev                  # http://localhost:3000
 ```
-
-En production :
-
-```bash
-npm run build
-npm start
-```
-
-Mettez `COOKIE_SECURE="true"` quand l'application est servie en HTTPS.
 
 ### Scripts
 
@@ -50,6 +69,7 @@ Mettez `COOKIE_SECURE="true"` quand l'application est servie en HTTPS.
 | `npm run dev` | Serveur de développement |
 | `npm run build` / `npm start` | Build et serveur de production |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
+| `npm run vercel-build` | Build utilisé par Vercel : migrations, super admin, build |
 | `npm run db:migrate` | Applique les migrations Prisma |
 | `npm run db:seed` | Crée le super admin s'il n'existe pas |
 | `npm run db:demo` | Seed + données de démonstration (si aucun plan n'existe) |
@@ -67,6 +87,8 @@ Téléchargez le modèle depuis **Appareils → Import Excel**. La première lig
 - Le type se déduit du libellé (« Poste », « Livebox », « Imprimante », « Borne wifi »… ; « Autre » par défaut).
 - Un appareil dont le **nom** existe déjà est mis à jour. S'il reste sur le même plan, sa position est conservée.
 - Les plans et zones inconnus sont créés. Les zones créées ainsi n'ont pas encore de contour : dessinez-le avec l'éditeur (**Zones → Dessiner**).
+- Fichier de 4 Mo maximum. Seule la première feuille du classeur est lue.
+- Les noms (appareils, plans, zones) sont comparés sans tenir compte des majuscules : « srv-ad01 » met à jour « SRV-AD01 ».
 - Un rapport indique les créations, les mises à jour et les lignes ignorées (nom manquant, IP invalide…).
 
 **Export Excel** (tous les rôles) : le même format, qu'on peut donc réimporter.
@@ -79,7 +101,7 @@ Téléchargez le modèle depuis **Appareils → Import Excel**. La première lig
 - 🔤 **Texte** : cliquer à l'endroit voulu.
 - 🔷 **Zone** : cliquer les sommets, puis cliquer le premier point (ou double-clic, ou `Entrée`) pour fermer.
 - **Appareils** : bouton « Placer » puis clic sur le plan. Glisser un appareil le déplace, et sa zone est recalculée.
-- **Plan** : nom, dimensions, image de fond (PNG/JPG/SVG ≤ 8 Mo), suppression.
+- **Plan** : nom, dimensions, image de fond (PNG/JPG/SVG, compressée automatiquement si elle est lourde), suppression.
 - Raccourcis : `Suppr` pour supprimer la sélection, `Ctrl+Z` pour annuler, `Ctrl+S` pour enregistrer, `Échap` pour annuler l'action en cours.
 
 Zones, appareils et réglages s'enregistrent immédiatement. Le dessin (murs, pièces, textes) s'enregistre avec le bouton **Enregistrer le dessin**.
@@ -124,9 +146,3 @@ src/
     excel.ts           import et export
     validation.ts      schémas zod
 ```
-
-### Passer à PostgreSQL
-
-1. Dans `prisma/schema.prisma`, mettez `provider = "postgresql"`.
-2. Remplacez `@prisma/adapter-better-sqlite3` par `@prisma/adapter-pg` dans `src/lib/prisma.ts` et `prisma/seed.ts`.
-3. Régénérez les migrations (`npx prisma migrate dev --name init`) et mettez à jour `DATABASE_URL`.

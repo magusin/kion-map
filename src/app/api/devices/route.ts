@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { handle, readJson } from "@/lib/api";
 import { requireApiUser } from "@/lib/auth";
 import { deviceSchema } from "@/lib/validation";
-import { deviceInclude, resolvePlacement, searchWhere } from "@/lib/devices";
+import { assertNameFree, deviceInclude, resolvePlacement, searchWhere } from "@/lib/devices";
 import { normalizeDeviceType } from "@/lib/types";
 
 export const GET = handle(async (req: Request) => {
@@ -24,6 +24,7 @@ export const GET = handle(async (req: Request) => {
 export const POST = handle(async (req: Request) => {
   await requireApiUser("MODERATOR");
   const data = deviceSchema.parse(await readJson(req));
+  await assertNameFree("device", data.name);
   const placement = await resolvePlacement(data);
   const device = await prisma.device.create({
     data: { ...data, ...placement, type: normalizeDeviceType(data.type) },

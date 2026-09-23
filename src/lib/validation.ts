@@ -45,10 +45,11 @@ export const planCreateSchema = z.object({
 });
 
 export const planUpdateSchema = planCreateSchema.partial().extend({
-  // data URL d'une image (≈ 8 Mo max) ou null pour retirer le fond
+  // data URL d'une image ou null pour retirer le fond.
+  // Vercel limite le corps des requêtes à 4,5 Mo : l'éditeur compresse l'image avant l'envoi.
   background: z
     .string()
-    .max(11_000_000)
+    .max(4_300_000, "Image trop lourde")
     .regex(/^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,/, "Image invalide")
     .nullable()
     .optional(),

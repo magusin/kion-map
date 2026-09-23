@@ -20,7 +20,7 @@ export const POST = handle(async (req: Request) => {
   }
 
   const { username, password } = schema.parse(await readJson(req));
-  const user = await prisma.user.findUnique({ where: { username } });
+  const user = await prisma.user.findFirst({ where: { username: { equals: username, mode: "insensitive" } } });
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     const e = entry && now - entry.since < WINDOW ? entry : { count: 0, since: now };
     e.count++;

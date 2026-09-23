@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { handle, readJson } from "@/lib/api";
 import { requireApiUser } from "@/lib/auth";
 import { planCreateSchema } from "@/lib/validation";
+import { assertNameFree } from "@/lib/devices";
 
 export const GET = handle(async () => {
   await requireApiUser();
@@ -21,6 +22,7 @@ export const GET = handle(async () => {
 export const POST = handle(async (req: Request) => {
   await requireApiUser("MODERATOR");
   const data = planCreateSchema.parse(await readJson(req));
+  await assertNameFree("plan", data.name);
   const plan = await prisma.plan.create({ data });
   return NextResponse.json(plan, { status: 201 });
 });

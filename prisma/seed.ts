@@ -1,23 +1,26 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
 const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "file:./data/kion-map.db" }),
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL }),
 });
 
 async function main() {
   const username = process.env.ADMIN_USERNAME || "admin";
-  const password = process.env.ADMIN_PASSWORD || "admin123";
+  const password = process.env.ADMIN_PASSWORD;
   const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) {
     console.log(`Le compte « ${username} » existe déjà, rien à faire.`);
+  } else if (!password || password.length < 8) {
+    // Pas de mot de passe par défaut : l'application est en ligne.
+    console.warn("ADMIN_PASSWORD absent ou trop court (8 caractères min.) : super admin non créé.");
   } else {
     await prisma.user.create({
       data: { username, passwordHash: await bcrypt.hash(password, 10), displayName: "Super admin", role: "ADMIN" },
     });
-    console.log(`Super admin créé : ${username} / ${password} — changez ce mot de passe après connexion.`);
+    console.log(`Super admin « ${username} » créé.`);
   }
 
   if (process.argv.includes("--demo") && (await prisma.plan.count()) === 0) {

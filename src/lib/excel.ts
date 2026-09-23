@@ -180,7 +180,7 @@ export async function importRows(rows: Row[]): Promise<ImportReport> {
         location: row.location ?? null,
       };
       const name = row.name.slice(0, 100);
-      const existing = await prisma.device.findUnique({ where: { name } });
+      const existing = await prisma.device.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
       if (existing) {
         // Même plan : on garde la position ; zone reprise du fichier seulement si l'appareil n'est pas positionné.
         const samePlan = existing.planId === planId;
