@@ -46,6 +46,20 @@ Cartographie du parc informatique : PC, serveurs, switchs, box, bornes Wi-Fi, im
 
 Limites propres à Vercel : un import Excel fait **4 Mo** au maximum, et les images de fond trop lourdes sont compressées automatiquement dans le navigateur avant l'envoi.
 
+### Dépannage
+
+Ouvrez **`https://<votre-site>/api/health`** (sans être connecté). La page indique ce qui ne va pas, sans jamais afficher de secret :
+
+| Message | Solution |
+| --- | --- |
+| `tables absentes : migrations non appliquées` | Le script `vercel-build` n'a pas tourné. Dans Vercel → Settings → Build & Deployment, le **Build Command** ne doit pas être surchargé (laissez la valeur par défaut), puis redéployez. Sinon, lancez `npx prisma migrate deploy` depuis votre PC avec les URL Neon dans `.env`. |
+| `SESSION_SECRET manquant ou trop court` | Ajoutez la variable (16 caractères minimum), puis redéployez. |
+| `DATABASE_URL manquant` | Liez la base Neon au projet (Storage), ou ajoutez la variable pour l'environnement concerné (Production ou Preview). |
+| `identifiants de DATABASE_URL refusés` | Le mot de passe Neon a changé : mettez à jour `DATABASE_URL` et `DATABASE_URL_UNPOOLED`. |
+| `aucun super admin` | Définissez `ADMIN_PASSWORD` (8 caractères minimum), puis redéployez. |
+
+Une variable ajoutée ou modifiée dans Vercel ne s'applique qu'**après un redéploiement**.
+
 ## Développement en local
 
 Prérequis : Node.js ≥ 20.9 et une base PostgreSQL. Le plus simple est une **branche de développement Neon** (Neon → Branches → New branch), pour ne pas toucher aux données de production. Un PostgreSQL local fonctionne aussi.

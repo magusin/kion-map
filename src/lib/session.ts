@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import { ConfigError } from "./errors";
 
 // Utilisable depuis proxy.ts, les route handlers et les server components.
 export const SESSION_COOKIE = "kion_session";
@@ -7,7 +8,7 @@ const DURATION_S = 12 * 60 * 60;
 function key() {
   const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 16) {
-    throw new Error("SESSION_SECRET manquant ou trop court (voir .env.example)");
+    throw new ConfigError("SESSION_SECRET manquant ou trop court (16 caractères minimum).");
   }
   return new TextEncoder().encode(secret);
 }
