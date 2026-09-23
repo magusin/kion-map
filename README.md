@@ -38,11 +38,12 @@ Cartographie du parc informatique : PC, serveurs, switchs, box, bornes Wi-Fi, im
    | `ADMIN_PASSWORD` | Mot de passe du super admin (8 caractères minimum) |
    | `COOKIE_SECURE` | `true` |
 
-3. **Redéployez** (Deployments → ⋯ → Redeploy). Le script `vercel-build` :
+3. **Branche de production** : `main`. Chaque push sur `main` déploie le site ; les autres branches donnent des déploiements *Preview*.
+4. **Redéployez** (Deployments → ⋯ → Redeploy). Le script `vercel-build` :
    - applique les migrations (`prisma migrate deploy`), ce qui crée les tables au premier déploiement ;
    - crée le super admin s'il n'existe pas encore ;
    - construit l'application.
-4. Connectez-vous avec `ADMIN_USERNAME` / `ADMIN_PASSWORD`, puis créez les autres comptes dans **Comptes**. Changer `ADMIN_PASSWORD` plus tard ne modifie pas un compte existant : changez le mot de passe dans l'application (**Mon compte**).
+5. Connectez-vous avec `ADMIN_USERNAME` / `ADMIN_PASSWORD`, puis créez les autres comptes dans **Comptes**. Changer `ADMIN_PASSWORD` plus tard ne modifie pas un compte existant : changez le mot de passe dans l'application (**Mon compte**).
 
 Limites propres à Vercel : un import Excel fait **4 Mo** au maximum, et les images de fond trop lourdes sont compressées automatiquement dans le navigateur avant l'envoi.
 
