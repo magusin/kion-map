@@ -12,8 +12,17 @@ export const GET = handle(async (req: Request) => {
   const type = url.searchParams.get("type");
   const planId = Number(url.searchParams.get("planId")) || undefined;
   const limit = Math.min(Number(url.searchParams.get("limit")) || 500, 2000);
+  const user = url.searchParams.get("user")?.trim();
   const devices = await prisma.device.findMany({
-    where: { AND: [searchWhere(url.searchParams.get("q")), type ? { type } : {}, planId ? { planId } : {}] },
+    where: {
+      AND: [
+        searchWhere(url.searchParams.get("q")),
+        type ? { type } : {},
+        planId ? { planId } : {},
+        // Appareils d'un opérateur (nom exact, sans tenir compte de la casse)
+        user ? { assignedUser: { equals: user, mode: "insensitive" } } : {},
+      ],
+    },
     include: deviceInclude,
     orderBy: { name: "asc" },
     take: limit,

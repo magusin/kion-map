@@ -212,7 +212,10 @@ export default function PlanViewer({ plan, zones, devices: initialDevices, plans
                     <li key={d.id}>
                       <button className="flex w-full gap-2 rounded px-1 py-0.5 text-left hover:bg-slate-50" onClick={() => select(d)}>
                         <span>{deviceType(d.type).icon}</span>
-                        <span className="flex-1 truncate">{d.name}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{d.name}</span>
+                          {d.assignedUser && <span className="block truncate text-xs text-slate-500">👤 {d.assignedUser}</span>}
+                        </span>
                         <span className="font-mono text-xs text-slate-500">{d.ip}</span>
                       </button>
                     </li>

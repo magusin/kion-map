@@ -21,8 +21,12 @@ export default function DeviceForm({ device, defaults, onClose, onSaved, onDelet
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [people, setPeople] = useState<string[]>([]);
+
   useEffect(() => {
     api<PlanSummary[]>("/api/plans").then(setPlans).catch(() => {});
+    // Suggestions pour garder la même orthographe d'un appareil à l'autre
+    api<{ name: string }[]>("/api/people").then((l) => setPeople(l.map((p) => p.name))).catch(() => {});
   }, []);
 
   const zones = plans.find((p) => p.id === planId)?.zones ?? [];
@@ -97,7 +101,12 @@ export default function DeviceForm({ device, defaults, onClose, onSaved, onDelet
         </div>
         <div>
           <label className="label">Utilisateur</label>
-          <input name="assignedUser" className="input" defaultValue={init.assignedUser ?? ""} />
+          <input name="assignedUser" className="input" defaultValue={init.assignedUser ?? ""} list="kion-people" autoComplete="off" placeholder="Prénom Nom" />
+          <datalist id="kion-people">
+            {people.map((p) => (
+              <option key={p} value={p} />
+            ))}
+          </datalist>
         </div>
         <div>
           <label className="label">Localisation</label>

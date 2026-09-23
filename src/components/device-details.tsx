@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { deviceType, type DeviceDTO } from "@/lib/types";
+import { personHref } from "@/lib/links";
 
 export default function DeviceDetails({
   device,
@@ -18,7 +19,14 @@ export default function DeviceDetails({
     ["Type", `${t.icon} ${t.label}`],
     ["Adresse IP", device.ip ? <code className="font-mono">{device.ip}</code> : null],
     ["Adresse MAC", device.mac ? <code className="font-mono">{device.mac}</code> : null],
-    ["Utilisateur", device.assignedUser],
+    [
+      "Utilisateur",
+      device.assignedUser ? (
+        <Link href={personHref(device.assignedUser)} className="text-blue-700 hover:underline" title="Voir tous ses appareils">
+          👤 {device.assignedUser}
+        </Link>
+      ) : null,
+    ],
     ["Localisation", device.location],
     ["Plan", device.plan?.name ?? <span className="text-amber-600">Non placé</span>],
     [

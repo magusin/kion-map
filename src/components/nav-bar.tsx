@@ -19,6 +19,7 @@ export default function NavBar({ user }: { user: SessionUser }) {
   const links = [
     { href: "/", label: "Plans" },
     { href: "/devices", label: "Appareils" },
+    { href: "/people", label: "Opérateurs" },
     ...(hasRole(user.role, "ADMIN") ? [{ href: "/admin/users", label: "Comptes" }] : []),
   ];
 

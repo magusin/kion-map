@@ -11,7 +11,7 @@ export const COLUMNS = [
   { key: "type", header: "Type", aliases: ["type", "categorie", "type appareil"] },
   { key: "ip", header: "IP", aliases: ["ip", "adresse ip", "ip address", "adresse"] },
   { key: "mac", header: "MAC", aliases: ["mac", "adresse mac", "mac address"] },
-  { key: "assignedUser", header: "Utilisateur", aliases: ["utilisateur", "user", "assigne a", "proprietaire", "responsable"] },
+  { key: "assignedUser", header: "Utilisateur", aliases: ["utilisateur", "user", "assigne a", "proprietaire", "responsable", "operateur", "collaborateur", "salarie"] },
   { key: "description", header: "Description", aliases: ["description", "commentaire", "remarque", "notes"] },
   { key: "location", header: "Localisation", aliases: ["localisation", "emplacement", "location", "bureau", "lieu"] },
   { key: "plan", header: "Plan", aliases: ["plan", "etage", "batiment", "site"] },

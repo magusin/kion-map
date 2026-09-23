@@ -5,6 +5,7 @@ Cartographie du parc informatique : PC, serveurs, switchs, box, bornes Wi-Fi, im
 - **Plans** dessinés dans l'application (murs, pièces, textes) ou importés depuis une image (plan scanné).
 - **Zones** en polygones (salle serveur, open space…). La zone d'un appareil se déduit de sa position sur le plan.
 - **Recherche** par nom, IP, MAC, utilisateur, description, localisation, zone ou plan. Un clic amène au plan, avec l'appareil centré et mis en évidence.
+- **Opérateurs** : liste des personnes (champ « Utilisateur » des appareils). Une recherche par nom montre tous les postes d'une personne et leur emplacement.
 - **Import / export Excel** (.xlsx, ou .csv avec `;` ou `,`).
 - **Comptes et rôles** :
 
@@ -55,7 +56,7 @@ Pour tester avec des données factices mais cohérentes, ajoutez la variable `SE
 - **environ 130 appareils** placés : postes et téléphones nominatifs, serveurs, switchs, pare-feu, box, bornes Wi-Fi, imprimantes, caméras, NAS. L'adressage IP est cohérent : `10.0.0.x` pour le réseau, `10.0.1.x` pour les serveurs, `10.0.10/20/30.x` pour les étages, `10.0.50.x` pour la vidéo ;
 - **4 appareils en stock**, sans plan, pour tester le placement.
 
-L'opération est sans risque à répéter : un plan ou un appareil qui existe déjà (même nom) n'est pas recréé. Retirez `SEED_DEMO` après le déploiement. En local : `npm run db:demo`.
+L'opération est sans risque à répéter : un plan ou un appareil qui existe déjà (même nom) n'est pas recréé, seul son utilisateur est complété s'il manque. Avec `SEED_DEMO` = `reset`, les données de démonstration (et seulement elles) sont supprimées puis recréées à jour. Retirez `SEED_DEMO` après le déploiement. En local : `npm run db:demo`.
 
 ### Dépannage
 

@@ -2,7 +2,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { seedDemo } from "./demo";
+import { resetDemo, seedDemo } from "./demo";
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL }),
@@ -36,7 +36,10 @@ async function main() {
   }
 
   // Données de démonstration : `npm run db:demo`, ou SEED_DEMO=true sur Vercel.
-  if (process.argv.includes("--demo") || process.env.SEED_DEMO === "true") {
+  // SEED_DEMO=reset : supprime puis recrée uniquement les données de démonstration.
+  const demo = process.env.SEED_DEMO;
+  if (demo === "reset") await resetDemo(prisma);
+  if (process.argv.includes("--demo") || demo === "true" || demo === "reset") {
     await seedDemo(prisma);
   }
 }

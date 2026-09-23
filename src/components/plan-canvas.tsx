@@ -73,7 +73,7 @@ export default function PlanCanvas(props: Props) {
   // La caméra est soit « tout afficher », soit centrée sur un point, soit libre (après zoom / déplacement).
   const [camera, setCamera] = useState<Camera>(focus ? { kind: "focus", pt: focus } : { kind: "fit" });
   const [panning, setPanning] = useState(false);
-  const pan = useRef<{ id: number; sx: number; sy: number; cam: FreeCamera; moved: boolean } | null>(null);
+  const pan = useRef<{ id: number; sx: number; sy: number; cam: FreeCamera; moved: boolean; target: CanvasTarget } | null>(null);
 
   // Nouveau point de focus (ex. appareil sélectionné) : on recentre la vue.
   const focusKey = focus ? `${focus[0]},${focus[1]}` : "";
@@ -139,7 +139,8 @@ export default function PlanCanvas(props: Props) {
     const handled = e.button === 0 && props.onPointerDown?.(e, pt, target);
     if (handled) return;
     if (e.button === 0 || e.button === 1) {
-      pan.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, cam: { kind: "free", ...cam }, moved: false };
+      // La cible est mémorisée ici : avec la capture du pointeur, le relâchement vise le SVG lui-même.
+      pan.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, cam: { kind: "free", ...cam }, moved: false, target };
       setPanning(true);
       e.currentTarget.setPointerCapture(e.pointerId);
     }
@@ -164,7 +165,7 @@ export default function PlanCanvas(props: Props) {
       setPanning(false);
       if (!p.moved && e.button === 0) {
         // Simple clic (sans déplacement de la vue)
-        const target = targetOf(e.target);
+        const target = p.target;
         if (target.kind === "device") {
           const d = devices.find((x) => x.id === target.id);
           if (d) props.onDeviceClick?.(d);

@@ -55,15 +55,20 @@ const PEOPLE = [
   "Laura Girard", "Julien André", "Inès Mercier", "Romain Blanc", "Clara Guerin", "Mathieu Boyer",
   "Océane Garnier", "Kevin Chevalier", "Pauline François", "Quentin Legrand", "Anaïs Gauthier", "Benoît Perrin",
   "Élodie Robin", "Florian Clément", "Mélanie Morin", "Adrien Nicolas", "Justine Henry", "Sébastien Roussel",
+  "Aurélie Mathieu", "Guillaume Masson", "Nathalie Lambert", "Vincent Faure", "Céline Rousseau", "Damien Bonnet",
+  "Sandrine Dumas", "Olivier Fontaine", "Émilie Lemaire", "Jérôme Barbier", "Caroline Meunier", "François Brun",
+  "Isabelle Schmitt", "Arnaud Colin", "Virginie Picard", "Cédric Renaud",
 ];
 let person = 0;
-const nextPerson = () => PEOPLE[person++ % PEOPLE.length];
+// Une personne = un seul bureau (la liste couvre tous les postes nominatifs de la démo).
+const nextPerson = () => PEOPLE[person++] ?? `Collaborateur ${person}`;
 
 /** Postes de travail : PC (+ téléphone IP un poste sur deux). */
-function workstations(room: Room, prefix: string, service: string, n: number, cols: number, subnet: string, start: number, laptops = 0): Dev[] {
+function workstations(room: Room, prefix: string, service: string, n: number, cols: number, subnet: string, start: number, laptops = 0, shared?: string): Dev[] {
   const out: Dev[] = [];
   desks(room, n, cols).forEach(([x, y], i) => {
-    const user = nextPerson();
+    // Postes partagés (salle de formation) : pas d'utilisateur nominatif
+    const user = shared ?? nextPerson();
     const num = String(i + 1).padStart(2, "0");
     const laptop = i < laptops;
     out.push({
@@ -93,6 +98,7 @@ function workstations(room: Room, prefix: string, service: string, n: number, co
 }
 
 function floors(): Floor[] {
+  person = 0; // mêmes attributions à chaque appel
   // ---------------- RDC ----------------
   const accueil: Room = { name: "Accueil", x: 40, y: 40, w: 340, h: 280, color: "#0ea5e9", description: "Hall d'entrée et banque d'accueil" };
   const serveur: Room = { name: "Salle serveur", x: 380, y: 40, w: 320, h: 280, color: "#7c3aed", description: "Accès restreint, climatisée" };
@@ -196,7 +202,7 @@ function floors(): Floor[] {
       ...workstations(direction, "DIR", "direction", 3, 3, "10.0.30", 21, 2),
       { name: "IMP-DIR", type: "printer", ip: "10.0.30.82", description: "Imprimante confidentielle (badge)", location: "Direction - secrétariat", x: 370, y: 300 },
       ...workstations(juridique, "JUR", "juridique", 4, 2, "10.0.30", 31),
-      ...workstations(formation, "FORM", "salle de formation", 8, 4, "10.0.30", 41),
+      ...workstations(formation, "FORM", "salle de formation", 8, 4, "10.0.30", 41, 0, "Salle de formation (libre-service)"),
       { name: "VIDEOPROJ-FORM", type: "other", ip: "10.0.30.90", description: "Vidéoprojecteur", location: "Salle de formation - plafond", x: 880, y: 225 },
       ...workstations(marketing, "MKT", "marketing", 8, 4, "10.0.30", 61, 2),
       { name: "IMP-2-MKT", type: "printer", ip: "10.0.30.80", description: "Traceur grand format", location: "Open space Marketing", x: 760, y: 620 },
@@ -219,13 +225,61 @@ const STOCK: Omit<Dev, "x" | "y">[] = [
   { name: "AP-SPARE", type: "access_point", description: "Borne Wi-Fi de rechange", location: "Armoire IT" } as Omit<Dev, "x" | "y">,
 ];
 
+/** Responsable des équipements partagés (imprimantes, réseau, caméras…). */
+const OWNERS: Record<string, string> = {
+  "IMP-ACCUEIL": "Accueil",
+  "IMP-RDC-COM": "Service commercial",
+  "IMP-1-COPIEUR": "Services généraux",
+  "IMP-1-COMPTA": "Service comptabilité",
+  "IMP-DIR": "Direction générale",
+  "IMP-2-MKT": "Service marketing",
+  "NVR-01": "Services généraux",
+  "VISIO-ATLAS": "Services généraux",
+  "VISIO-ORION": "Services généraux",
+  "VIDEOPROJ-FORM": "Services généraux",
+};
+function owner(d: { name: string; type: string; assignedUser?: string }): string | undefined {
+  if (d.assignedUser) return d.assignedUser;
+  if (OWNERS[d.name]) return OWNERS[d.name];
+  if (d.type === "camera") return "Services généraux";
+  if (["firewall", "router", "switch", "box", "server", "nas", "access_point", "other"].includes(d.type)) return "Service IT";
+  return undefined; // appareils en stock : pas encore attribués
+}
+
+/** Crée l'appareil, ou complète l'utilisateur d'un appareil de démo déjà présent. */
+async function upsertDevice(prisma: PrismaClient, data: Parameters<PrismaClient["device"]["create"]>[0]["data"]): Promise<boolean> {
+  const existing = await prisma.device.findFirst({ where: { name: { equals: data.name, mode: "insensitive" } } });
+  if (!existing) {
+    await prisma.device.create({ data });
+    return true;
+  }
+  if (!existing.assignedUser && data.assignedUser) {
+    await prisma.device.update({ where: { id: existing.id }, data: { assignedUser: data.assignedUser } });
+  }
+  return false;
+}
+
+/**
+ * Supprime uniquement les données de démonstration (plans et appareils portant les noms de la démo),
+ * pour les recréer à jour. Les autres données ne sont pas touchées.
+ */
+export async function resetDemo(prisma: PrismaClient) {
+  const fl = floors();
+  const names = [...fl.flatMap((f) => f.devices.map((d) => d.name)), ...STOCK.map((d) => d.name)];
+  const devices = await prisma.device.deleteMany({ where: { name: { in: names } } });
+  const plans = await prisma.plan.deleteMany({ where: { name: { in: fl.map((f) => f.name) } } });
+  console.log(`Démo : ${plans.count} plan(s) et ${devices.count} appareil(s) de démonstration supprimés.`);
+}
+
 export async function seedDemo(prisma: PrismaClient) {
   let plans = 0;
   let devices = 0;
   for (const f of floors()) {
     const exists = await prisma.plan.findFirst({ where: { name: { equals: f.name, mode: "insensitive" } } });
     if (exists) {
-      console.log(`Démo : le plan « ${f.name} » existe déjà, ignoré.`);
+      // Plan déjà là : on complète seulement les utilisateurs manquants de ses appareils.
+      for (const d of f.devices) await upsertDevice(prisma, { ...d, assignedUser: owner(d), planId: exists.id });
+      console.log(`Démo : le plan « ${f.name} » existe déjà, utilisateurs manquants complétés.`);
       continue;
     }
     const shapes = [
@@ -255,15 +309,11 @@ export async function seedDemo(prisma: PrismaClient) {
         .sort((a, b) => a.area - b.area)[0]?.id ?? null;
 
     for (const d of f.devices) {
-      if (await prisma.device.findFirst({ where: { name: { equals: d.name, mode: "insensitive" } } })) continue;
-      await prisma.device.create({ data: { ...d, mac: mac(), planId: plan.id, zoneId: zoneAt(d.x, d.y) } });
-      devices++;
+      if (await upsertDevice(prisma, { ...d, assignedUser: owner(d), mac: mac(), planId: plan.id, zoneId: zoneAt(d.x, d.y) })) devices++;
     }
   }
   for (const d of STOCK) {
-    if (await prisma.device.findFirst({ where: { name: { equals: d.name, mode: "insensitive" } } })) continue;
-    await prisma.device.create({ data: { ...d, mac: mac() } });
-    devices++;
+    if (await upsertDevice(prisma, { ...d, mac: mac() })) devices++;
   }
   console.log(`Démo : ${plans} plan(s) et ${devices} appareil(s) ajoutés.`);
 }

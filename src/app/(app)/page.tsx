@@ -24,7 +24,7 @@ export default async function HomePage() {
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-6">
       <section className="card p-5">
         <h1 className="text-lg font-semibold">Où se trouve un appareil ?</h1>
-        <p className="mb-3 text-sm text-slate-500">Recherchez par nom, adresse IP, MAC, utilisateur, description ou localisation.</p>
+        <p className="mb-3 text-sm text-slate-500">Recherchez un appareil (nom, IP, MAC, description, localisation) ou une personne pour voir ses postes.</p>
         <SearchBox />
       </section>
 
