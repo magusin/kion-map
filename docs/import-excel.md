@@ -67,9 +67,25 @@ Ces contrôles s'appliquent à la saisie, et un copier-coller les contourne ; l'
 ## Règles d'import
 
 - **Clé = Nom.** Un nom déjà présent en base **met à jour** l'appareil au lieu d'en créer un nouveau. La casse est ignorée : `pc-achats-01` = `PC-ACHATS-01`.
-- **Position conservée.** Si l'appareil reste sur le même plan, sa position n'est pas modifiée. S'il change de plan, il faudra le replacer.
-- **Plans et zones créés automatiquement** s'ils n'existent pas (noms comparés sans tenir compte de la casse). Une zone créée ainsi n'a pas encore de contour : il faut la dessiner dans l'éditeur (**Zones → Dessiner**).
+- **Plans et zones créés automatiquement** s'ils n'existent pas. Une zone créée ainsi n'a pas encore de contour : il faut la dessiner dans l'éditeur (**Zones → Dessiner**).
+- **Correspondance des noms** de plans et de zones : les majuscules, les accents, les espaces en trop et les séparateurs `-` `_` `.` sont ignorés (`comptabilite` = `Comptabilité`, `Salle-serveur` = `Salle serveur`). Un nom différent (`Compta`), ou mal orthographié, **crée une nouvelle zone** : vérifiez la liste « Zones créées » du rapport.
+- **Une zone n'est cherchée que dans le plan de la même ligne.** « Comptabilité » avec le plan « RDC » ne trouve pas celle du « 1er étage ».
 - **Une zone sans plan est ignorée** et signalée dans le rapport.
+
+### Placement automatique dans les zones
+
+Quand une ligne indique une **zone déjà dessinée**, l'appareil est **posé automatiquement dans cette zone**. Les appareils sont rangés en grille, à partir du coin supérieur gauche, à l'écart de ceux déjà présents, et jamais dans une sous-zone incluse dans la zone.
+
+| Situation de l'appareil | Résultat |
+| --- | --- |
+| Nouvel appareil | Posé dans la zone |
+| Existant, sans zone ou sans position | Posé dans la zone |
+| Existant, placé dans **une autre zone** (zone fausse ou changée) | **Déplacé** dans la zone du fichier |
+| Existant, déjà placé **dans cette zone** (y compris dans une sous-zone : un serveur de « Baie B » quand le fichier indique « Salle serveur ») | Position **conservée** |
+| Zone **pas encore dessinée** (par exemple créée par l'import) | Rattaché à la zone, sans position. Il sera posé automatiquement **dès que le contour de la zone sera dessiné**. |
+| Pas de zone dans le fichier | Position conservée s'il reste sur le même plan ; sinon il est à placer |
+
+Un réimport du même fichier ne déplace donc rien. Une fois l'appareil posé, un modérateur ou un super admin peut **ajuster sa position** : fiche de l'appareil → **📍 Déplacer**, ou glisser dans l'éditeur. La zone suit la position.
 - **Lignes ignorées** : nom manquant, ou IP invalide (`10.0.300.1`). Le rapport donne le numéro de ligne et la raison.
 - **Lignes vides** : ignorées sans erreur.
 - **Supprimer une ligne du fichier ne supprime pas l'appareil.** La suppression se fait dans l'application (fiche de l'appareil → Modifier → Supprimer).
@@ -80,17 +96,19 @@ Ces contrôles s'appliquent à la saisie, et un copier-coller les contourne ; l'
 Après l'import, l'application affiche :
 
 - le nombre d'appareils **créés**, **mis à jour** et **ignorés** ;
+- le nombre d'appareils **placés automatiquement** dans leur zone, et ceux **en attente** d'une zone à dessiner ;
 - les **plans** et **zones** créés ;
 - les **avertissements**, avec le numéro de ligne Excel.
 
 ## Après l'import
 
-1. **Plans →** ouvrez le plan, puis **✏️**.
-2. Onglet **Zones** : cliquez sur **Dessiner** pour chaque zone créée par l'import, en suivant les coins de la pièce.
-3. Onglet **Appareils** : cliquez sur **Placer**, puis à l'emplacement de l'appareil sur le plan. Sa zone est déduite de sa position.
+1. Les appareils dont la zone était dessinée sont **déjà sur le plan**. Ajustez leur position si besoin (fiche → **📍 Déplacer**).
+2. Pour les zones créées par l'import : **Plans →** ouvrez le plan, puis **✏️** → onglet **Zones** → **Dessiner**, en suivant les coins de la pièce. Les appareils de cette zone y sont posés automatiquement.
+3. Les appareils sans zone : fiche → **📍 Placer sur le plan**, ou dans l'éditeur, onglet **Appareils** → **Placer**.
 
 ## Pour les développeurs
 
+- Placement automatique : `AutoPlacer` et `placeWaitingDevices` dans [`src/lib/devices.ts`](../src/lib/devices.ts). `PATCH /api/zones/:id` pose les appareils en attente quand un contour est dessiné.
 - Lecture et écriture : [`src/lib/excel.ts`](../src/lib/excel.ts). Les en-têtes reconnus sont dans `COLUMNS`, les aides et limites dans `HELP`, les exemples dans `TEMPLATE_EXAMPLES`.
 - Routes : `POST /api/import` (multipart, champ `file`), `GET /api/import/template`, `GET /api/export`.
 - Types d'appareils et correspondance des libellés : `DEVICE_TYPES` et `normalizeDeviceType` dans [`src/lib/types.ts`](../src/lib/types.ts).

@@ -136,9 +136,10 @@ export default function PlanEditor(props: {
   // ---- Zones ---------------------------------------------------------------
   async function saveZonePoints(id: number, points: Point[]) {
     try {
-      const z = await api<ZoneDTO>(`/api/zones/${id}`, { method: "PATCH", body: { points } });
+      const z = await api<ZoneDTO & { placed?: number }>(`/api/zones/${id}`, { method: "PATCH", body: { points } });
       setZones((all) => all.map((x) => (x.id === id ? z : x)));
       await refreshDeviceZones();
+      if (z.placed) flash(`${z.placed} appareil(s) en attente placé(s) dans « ${z.name} »`);
     } catch (err) {
       flash((err as Error).message, true);
     }

@@ -7,6 +7,8 @@ type Report = {
   created: number;
   updated: number;
   skipped: number;
+  placed: number;
+  toPlace: number;
   plansCreated: string[];
   zonesCreated: string[];
   errors: { row: number; message: string }[];
@@ -43,8 +45,11 @@ export default function ImportModal({ onClose, onDone }: { onClose: () => void; 
             <i>Nom, Type, IP, MAC, Utilisateur, Description, Localisation, Plan, Zone</i>.
           </p>
           <ul className="list-disc space-y-1 pl-5 text-slate-600">
-            <li>Un appareil dont le nom existe déjà est <b>mis à jour</b> (sa position sur le plan est conservée).</li>
-            <li>Les plans et zones inconnus sont <b>créés automatiquement</b> ; il suffit ensuite de dessiner les zones et placer les appareils.</li>
+            <li>Un appareil dont le nom existe déjà est <b>mis à jour</b>.</li>
+            <li>
+              Si la zone indiquée est déjà dessinée, l&apos;appareil y est <b>placé automatiquement</b> (s&apos;il n&apos;y était pas déjà). Sa position reste ajustable ensuite.
+            </li>
+            <li>Les plans et zones inconnus sont <b>créés automatiquement</b> ; leurs appareils s&apos;y placeront dès que vous dessinerez le contour de la zone.</li>
           </ul>
           <a href="/api/import/template" className="btn btn-sm">⬇ Télécharger le modèle Excel</a>
           <input type="file" accept=".xlsx,.csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full rounded border border-dashed border-slate-300 p-4" />
@@ -63,6 +68,16 @@ export default function ImportModal({ onClose, onDone }: { onClose: () => void; 
             <div className="rounded bg-blue-50 p-3"><div className="text-2xl font-bold text-blue-700">{report.updated}</div>mis à jour</div>
             <div className="rounded bg-amber-50 p-3"><div className="text-2xl font-bold text-amber-700">{report.skipped}</div>ignoré(s)</div>
           </div>
+          {report.placed > 0 && (
+            <p className="rounded bg-green-50 px-3 py-2 text-green-800">
+              📍 <b>{report.placed}</b> appareil(s) placé(s) automatiquement dans leur zone. Vous pouvez ajuster leur position (fiche → Déplacer).
+            </p>
+          )}
+          {report.toPlace > 0 && (
+            <p className="rounded bg-amber-50 px-3 py-2 text-amber-800">
+              ⚠ <b>{report.toPlace}</b> appareil(s) rattaché(s) à une zone pas encore dessinée : ils seront placés automatiquement dès que vous dessinerez son contour (éditeur → Zones → Dessiner).
+            </p>
+          )}
           {report.plansCreated.length > 0 && <p><b>Plans créés :</b> {report.plansCreated.join(", ")}</p>}
           {report.zonesCreated.length > 0 && <p><b>Zones créées (à dessiner) :</b> {report.zonesCreated.join(", ")}</p>}
           {report.errors.length > 0 && (

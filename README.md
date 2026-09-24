@@ -111,6 +111,7 @@ En résumé :
 - Téléchargez le modèle depuis **Appareils → Import Excel → Télécharger le modèle Excel**. Il contient 3 onglets : **Appareils** (seul onglet lu), **Mode d'emploi** et **Listes**. Il propose une liste déroulante pour le Type, un contrôle des noms en double et une aide sur chaque colonne.
 - Colonnes : **Nom** (obligatoire, unique), Type, IP, MAC, Utilisateur, Description, Localisation, Plan, Zone.
 - Un Nom déjà présent met l'appareil à jour. Les plans et zones inconnus sont créés automatiquement.
+- **Si la zone indiquée est dessinée, l'appareil y est placé automatiquement**, sauf s'il s'y trouve déjà. Ceux d'une zone pas encore dessinée y sont posés dès que son contour est tracé. La position reste ajustable (fiche → 📍 Déplacer).
 - **L'export Excel a le même format** : exportez, corrigez, réimportez.
 - 4 Mo maximum, en `.xlsx` ou `.csv`.
 

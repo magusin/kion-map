@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { DEVICE_TYPES, normalizeDeviceType, deviceType } from "./types";
 import { isValidIp } from "./validation";
 import { ApiError } from "./api";
+import { AutoPlacer } from "./devices";
 
 /** Colonnes du fichier (ordre du modèle) et en-têtes acceptés à l'import. */
 export const COLUMNS = [
@@ -118,6 +119,10 @@ export type ImportReport = {
   created: number;
   updated: number;
   skipped: number;
+  /** Appareils posés automatiquement dans leur zone */
+  placed: number;
+  /** Appareils rattachés à une zone sans contour : à placer à la main (ou quand la zone sera dessinée) */
+  toPlace: number;
   plansCreated: string[];
   zonesCreated: string[];
   errors: { row: number; message: string }[];
@@ -126,11 +131,18 @@ export type ImportReport = {
 /**
  * Importe les appareils : mise à jour si le nom existe déjà, création sinon.
  * Les plans et zones inconnus sont créés (zones sans contour, à dessiner ensuite).
+ *
+ * Placement quand la ligne indique une zone :
+ * - zone dessinée : l'appareil y est posé automatiquement, sauf s'il s'y trouve déjà
+ *   (position conservée, même dans une sous-zone incluse dans celle-ci) ;
+ * - zone sans contour : l'appareil y est rattaché sans position (à placer ensuite).
+ * Sans zone dans le fichier : position conservée si l'appareil reste sur le même plan.
  */
 export async function importRows(rows: Row[]): Promise<ImportReport> {
-  const report: ImportReport = { created: 0, updated: 0, skipped: 0, plansCreated: [], zonesCreated: [], errors: [] };
+  const report: ImportReport = { created: 0, updated: 0, skipped: 0, placed: 0, toPlace: 0, plansCreated: [], zonesCreated: [], errors: [] };
   const planCache = new Map<string, number>();
   const zoneCache = new Map<string, number>();
+  const placer = new AutoPlacer();
 
   for (const p of await prisma.plan.findMany({ select: { id: true, name: true } })) planCache.set(norm(p.name), p.id);
   for (const z of await prisma.zone.findMany({ select: { id: true, name: true, planId: true } })) zoneCache.set(`${z.planId}|${norm(z.name)}`, z.id);
@@ -165,6 +177,7 @@ export async function importRows(rows: Row[]): Promise<ImportReport> {
         if (!zoneId) {
           zoneId = (await prisma.zone.create({ data: { planId, name: row.zone.slice(0, 100), points: [] } })).id;
           zoneCache.set(k, zoneId);
+          placer.reset(planId);
           report.zonesCreated.push(`${row.plan} / ${row.zone}`);
         }
       } else if (row.zone && !planId) {
@@ -181,23 +194,36 @@ export async function importRows(rows: Row[]): Promise<ImportReport> {
       };
       const name = row.name.slice(0, 100);
       const existing = await prisma.device.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
+
+      // Position de départ : celle de l'appareil s'il reste sur le même plan.
+      const samePlan = !!existing && existing.planId === planId;
+      let placement = {
+        zoneId: samePlan ? existing!.zoneId : null,
+        x: samePlan ? existing!.x : null,
+        y: samePlan ? existing!.y : null,
+      };
+
+      if (planId && zoneId) {
+        const positioned = placement.x !== null && placement.y !== null;
+        const alreadyInZone = positioned && (await placer.contains(planId, zoneId, placement.x!, placement.y!));
+        if (!alreadyInZone) {
+          const spot = await placer.spot(planId, zoneId);
+          if (spot) {
+            placement = { zoneId, x: spot[0], y: spot[1] };
+            report.placed++;
+          } else {
+            // Zone pas encore dessinée : rattachement seul, position à définir.
+            placement = { zoneId, x: null, y: null };
+            report.toPlace++;
+          }
+        }
+      }
+
       if (existing) {
-        // Même plan : on garde la position ; zone reprise du fichier seulement si l'appareil n'est pas positionné.
-        const samePlan = existing.planId === planId;
-        const positioned = samePlan && existing.x !== null;
-        await prisma.device.update({
-          where: { id: existing.id },
-          data: {
-            ...data,
-            planId,
-            zoneId: positioned ? existing.zoneId : zoneId,
-            x: samePlan ? existing.x : null,
-            y: samePlan ? existing.y : null,
-          },
-        });
+        await prisma.device.update({ where: { id: existing.id }, data: { ...data, planId, ...placement } });
         report.updated++;
       } else {
-        await prisma.device.create({ data: { ...data, name, planId, zoneId } });
+        await prisma.device.create({ data: { ...data, name, planId, ...placement } });
         report.created++;
       }
     } catch (err) {
