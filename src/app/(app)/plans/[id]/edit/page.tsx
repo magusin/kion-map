@@ -8,6 +8,7 @@ import PlanEditor from "@/components/plan-editor";
 export default async function EditPlanPage(props: PageProps<"/plans/[id]/edit">) {
   await requirePageUser("MODERATOR");
   const { id } = await props.params;
+  const { device, move } = await props.searchParams;
   const plan = await prisma.plan.findUnique({
     where: { id: Number(id) || 0 },
     include: { zones: { orderBy: { name: "asc" } } },
@@ -19,5 +20,15 @@ export default async function EditPlanPage(props: PageProps<"/plans/[id]/edit">)
     include: deviceInclude,
     orderBy: { name: "asc" },
   });
-  return <PlanEditor key={plan.id} plan={toPlanDTO(plan)} zones={plan.zones.map(toZoneDTO)} devices={devices.map(toDeviceDTO)} />;
+  const deviceId = Number(device) || null;
+  return (
+    <PlanEditor
+      key={plan.id}
+      plan={toPlanDTO(plan)}
+      zones={plan.zones.map(toZoneDTO)}
+      devices={devices.map(toDeviceDTO)}
+      initialDeviceId={devices.some((d) => d.id === deviceId) ? deviceId : null}
+      initialMove={move === "1"}
+    />
+  );
 }

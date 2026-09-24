@@ -7,6 +7,7 @@ import { DEVICE_TYPES, deviceType, type DeviceDTO } from "@/lib/types";
 import DeviceDetails from "./device-details";
 import DeviceForm from "./device-form";
 import ImportModal from "./import-modal";
+import { moveDeviceHref } from "@/lib/links";
 
 type Props = {
   plans: { id: number; name: string }[];
@@ -164,7 +165,7 @@ export default function DeviceList({ plans, canEdit, initial }: Props) {
 
       {selected && (
         <div className="w-full shrink-0 lg:sticky lg:top-20 lg:w-80 lg:self-start">
-          <DeviceDetails device={selected} showPlanLink onClose={() => setSelectedId(null)} onEdit={canEdit ? () => setEditing(selected) : undefined} />
+          <DeviceDetails device={selected} showPlanLink onClose={() => setSelectedId(null)} onEdit={canEdit ? () => setEditing(selected) : undefined} moveHref={canEdit ? moveDeviceHref(selected) : undefined} />
         </div>
       )}
 

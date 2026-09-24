@@ -8,9 +8,12 @@ export default function DeviceDetails({
   onEdit,
   onClose,
   showPlanLink,
+  moveHref,
 }: {
   device: DeviceDTO;
   onEdit?: () => void;
+  /** Lien vers l'éditeur, prêt à poser l'appareil (modérateurs). */
+  moveHref?: string;
   onClose?: () => void;
   showPlanLink?: boolean;
 }) {
@@ -62,11 +65,16 @@ export default function DeviceDetails({
           </div>
         ))}
       </dl>
-      {(onEdit || (showPlanLink && device.planId)) && (
+      {(onEdit || moveHref || (showPlanLink && device.planId)) && (
         <div className="flex gap-2 border-t border-slate-200 bg-slate-50 p-2">
           {showPlanLink && device.planId && (
             <Link href={`/plans/${device.planId}?device=${device.id}`} className="btn btn-sm btn-primary">
               📍 Voir sur le plan
+            </Link>
+          )}
+          {moveHref && (
+            <Link href={moveHref} className="btn btn-sm" title="Ouvre l'éditeur du plan : cliquez ensuite à l'endroit voulu">
+              📍 {device.x === null ? "Placer sur le plan" : "Déplacer"}
             </Link>
           )}
           {onEdit && (

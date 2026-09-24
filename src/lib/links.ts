@@ -9,3 +9,8 @@ export function deviceHref(d: Pick<DeviceDTO, "id" | "planId">) {
 export function personHref(name: string) {
   return `/people?name=${encodeURIComponent(name)}`;
 }
+
+/** Éditeur du plan, avec l'appareil prêt à être posé d'un clic. */
+export function moveDeviceHref(d: Pick<DeviceDTO, "id" | "planId">) {
+  return d.planId ? `/plans/${d.planId}/edit?device=${d.id}&move=1` : undefined;
+}

@@ -35,7 +35,16 @@ function translateShape(s: Shape, dx: number, dy: number): Shape {
   return { ...s, x: s.x + dx, y: s.y + dy };
 }
 
-export default function PlanEditor(props: { plan: PlanDTO; zones: ZoneDTO[]; devices: DeviceDTO[] }) {
+export default function PlanEditor(props: {
+  plan: PlanDTO;
+  zones: ZoneDTO[];
+  devices: DeviceDTO[];
+  /** Appareil sélectionné à l'ouverture (?device=) */
+  initialDeviceId?: number | null;
+  /** Ouvrir en mode « poser l'appareil » (?move=1) */
+  initialMove?: boolean;
+}) {
+  const startMove = !!(props.initialDeviceId && props.initialMove);
   const router = useRouter();
   const [plan, setPlan] = useState(props.plan);
   const [shapes, setShapes] = useState<Shape[]>(props.plan.shapes);
@@ -43,19 +52,19 @@ export default function PlanEditor(props: { plan: PlanDTO; zones: ZoneDTO[]; dev
   const [dirty, setDirty] = useState(false);
   const [zones, setZones] = useState(props.zones);
   const [devices, setDevices] = useState(props.devices);
-  const [tool, setTool] = useState<Tool>("select");
-  const [sel, setSel] = useState<Selection>(null);
+  const [tool, setTool] = useState<Tool>(startMove ? "place" : "select");
+  const [sel, setSel] = useState<Selection>(props.initialDeviceId ? { kind: "device", id: props.initialDeviceId } : null);
   const [draft, setDraft] = useState<Point[]>([]);
   const [cursor, setCursor] = useState<Point | null>(null);
   const [drag, setDrag] = useState<Drag>(null);
   const [snap, setSnap] = useState(true);
   const [grid, setGrid] = useState(true);
-  const [placing, setPlacing] = useState<number | null>(null);
+  const [placing, setPlacing] = useState<number | null>(startMove ? props.initialDeviceId! : null);
   const [zoneFor, setZoneFor] = useState<number | null>(null); // zone existante à (re)dessiner
   const [newZone, setNewZone] = useState<Point[] | null>(null);
   const [editDevice, setEditDevice] = useState<DeviceDTO | null>(null);
   const [newDeviceAt, setNewDeviceAt] = useState<Point | null>(null);
-  const [tab, setTab] = useState<"props" | "devices" | "zones" | "plan">("devices");
+  const [tab, setTab] = useState<"props" | "devices" | "zones" | "plan">(props.initialDeviceId ? "props" : "devices");
   const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const scaleRef = useRef(1);
@@ -378,7 +387,11 @@ export default function PlanEditor(props: { plan: PlanDTO; zones: ZoneDTO[]; dev
   const selectedShape = sel?.kind === "shape" ? shapes.find((s) => s.id === sel.id) : undefined;
   const selectedZone = sel?.kind === "zone" ? zones.find((z) => z.id === sel.id) : undefined;
   const selectedDevice = sel?.kind === "device" ? devices.find((d) => d.id === sel.id) : undefined;
-  const hint = tool === "place" ? "Cliquez sur le plan pour positionner l'appareil (Échap pour annuler)." : TOOLS.find((t) => t.id === tool)?.hint;
+  const placingName = devices.find((d) => d.id === placing)?.name;
+  const hint =
+    tool === "place"
+      ? `📍 Cliquez sur le plan à l'endroit où poser « ${placingName ?? "l'appareil"} » (Échap pour annuler).`
+      : TOOLS.find((t) => t.id === tool)?.hint;
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
@@ -416,10 +429,19 @@ export default function PlanEditor(props: { plan: PlanDTO; zones: ZoneDTO[]; dev
           </button>
         </div>
       </div>
-      <div className="truncate border-b border-slate-200 bg-blue-50 px-3 py-1 text-xs text-blue-900">
-        {zoneFor && tool === "zone" ? `Dessin du contour de « ${zones.find((z) => z.id === zoneFor)?.name} » — ` : ""}
-        {hint} Zones, appareils et réglages sont enregistrés immédiatement ; murs/pièces/textes via « Enregistrer le dessin ».
-      </div>
+      {tool === "place" ? (
+        <div className="flex items-center gap-3 border-b border-amber-300 bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900">
+          <span className="flex-1">{hint}</span>
+          <button className="btn btn-sm" onClick={() => chooseTool("select")}>
+            Annuler
+          </button>
+        </div>
+      ) : (
+        <div className="truncate border-b border-slate-200 bg-blue-50 px-3 py-1 text-xs text-blue-900">
+          {zoneFor && tool === "zone" ? `Dessin du contour de « ${zones.find((z) => z.id === zoneFor)?.name} » — ` : ""}
+          {hint} Zones, appareils et réglages sont enregistrés immédiatement ; murs/pièces/textes via « Enregistrer le dessin ».
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1">
@@ -494,8 +516,20 @@ export default function PlanEditor(props: { plan: PlanDTO; zones: ZoneDTO[]; dev
                         </div>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-500">Glissez l&apos;appareil sur le plan pour le déplacer : sa zone est mise à jour automatiquement.</p>
+                    <p className="text-xs text-slate-500">
+                      Pour le déplacer : glissez-le sur le plan, ou cliquez sur « Déplacer » puis sur le nouvel emplacement. Sa zone est mise à jour automatiquement.
+                    </p>
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        className={`btn btn-sm ${placing === selectedDevice.id ? "btn-primary" : ""}`}
+                        onClick={() => {
+                          setTool("place");
+                          setPlacing(selectedDevice.id);
+                          setDraft([]);
+                        }}
+                      >
+                        📍 Déplacer
+                      </button>
                       <button className="btn btn-sm" onClick={() => setEditDevice(selectedDevice)}>✏️ Modifier</button>
                       <button className="btn btn-sm btn-danger" onClick={deleteSelection}>Retirer du plan</button>
                     </div>

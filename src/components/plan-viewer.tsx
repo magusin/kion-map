@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import PlanCanvas from "./plan-canvas";
 import DeviceDetails from "./device-details";
 import DeviceForm from "./device-form";
+import { moveDeviceHref } from "@/lib/links";
 import { deviceType, type DeviceDTO, type PlanDTO, type Point, type ZoneDTO } from "@/lib/types";
 
 type Props = {
@@ -192,6 +193,7 @@ export default function PlanViewer({ plan, zones, devices: initialDevices, plans
                 device={selected}
                 onClose={() => setSelectedId(null)}
                 onEdit={canEdit ? () => setEditing(selected) : undefined}
+                moveHref={canEdit ? moveDeviceHref(selected) : undefined}
               />
             </div>
           )}

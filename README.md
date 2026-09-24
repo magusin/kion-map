@@ -122,6 +122,7 @@ En résumé :
 - 🔤 **Texte** : cliquer à l'endroit voulu.
 - 🔷 **Zone** : cliquer les sommets, puis cliquer le premier point (ou double-clic, ou `Entrée`) pour fermer.
 - **Appareils** : bouton « Placer » puis clic sur le plan. Glisser un appareil le déplace, et sa zone est recalculée.
+- **Déplacer un appareil depuis sa fiche** : sur le plan ou dans la liste Appareils, ouvrez la fiche puis cliquez sur **📍 Déplacer**. L'éditeur s'ouvre avec un bandeau orange, et il suffit de cliquer au nouvel emplacement. Sur la page de consultation d'un plan, glisser déplace la vue, pas l'appareil : la position se modifie uniquement dans l'éditeur.
 - **Plan** : nom, dimensions, image de fond (PNG/JPG/SVG, compressée automatiquement si elle est lourde), suppression.
 - Raccourcis : `Suppr` pour supprimer la sélection, `Ctrl+Z` pour annuler, `Ctrl+S` pour enregistrer, `Échap` pour annuler l'action en cours.
 
